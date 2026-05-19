@@ -50,26 +50,65 @@ params.m  = 11.8;
 params.mx = 1.5;
 params.my = 6.0;
 params.B = 0.82;
+params.g = 9.81;
+params.W = params.m*params.g;
 
-params.Iz = 2.20;
-params.Jz = 0.0;
+% =========================
+% SURGE
+% =========================
+params.A1  = 1.5066;
+params.A2  = -0.7405;
+params.A3  = 0.4219;
+params.A4  = -0.1397;
 
-params.Ix = 1.00;
-params.Jx = 0.0;
+% =========================
+% SWAY
+% =========================
+params.A5  = -0.1464;
+params.A6  = -3.1952;
+params.A7  = 4.1189;
+params.A8  = 0;
+params.A9  = 0;
 
-params.alphay = 0.20;
-params.lx = 0.15;
-params.ly = 0.10;
+% =========================
+% INPUT GAINS
+% =========================
+params.A18 = 0.0178;
 
-params.GMT = 0.04;
-params.g   = 9.81;
-params.W   = params.m*params.g;
-params.hCG = 0.20;
+% DIBESARKAN supaya yaw hidup
+params.A19 = 0.02;
 
-params.Xu=-15; params.Xuu=-5;
-params.Yv=-30; params.Yvv=-25;
-params.Nr=-6;  params.Nrr=-12;
-params.Kp=-4;  params.Kpp=-6;
+% relasi internal yaw
+params.A10 = (params.A1/params.A18)*params.A19;
+params.A11 = (1/params.A18)*params.A19;
+
+% =========================
+% YAW
+% =========================
+params.A12 = -0.35;
+params.A13 = 1.4038;
+params.A14 = -2.0764;
+params.A15 = 0.0010;
+params.A16 = 0.9671;
+params.A17 = 0.0021;
+
+params.A20 = 0;
+params.A21 = 0;
+params.A22 = 0;
+
+% =========================
+% ROLL
+% =========================
+params.KpLin  = 0;
+params.KpAbs  = 0;
+params.KpCub  = 0;
+
+params.Kphi   = 13.5523;
+params.Kfy    = -0.0175;
+params.Kv     = -3.3096;
+params.Kr     = -2.7576;
+params.Kdelta = 0.1738;
+params.Kbias  = -0.3631;
 
 
 %% limit aktuator
@@ -79,7 +118,7 @@ lims.TN=80;
 lims.TK=60;
 
 %% ===== BANKING (ROLL COUPLING) =====
-bank.k_bank      = 4;
+bank.k_bank      = 1.5;
 bank.phi_max_deg = 10;
 bank.phi_max     = deg2rad(bank.phi_max_deg);
 
@@ -242,7 +281,7 @@ legend([pSWg pWGg pSmooth], ...
     'Location','bestoutside');
 
 %% ===== Tracking & Dynamics (grid units) =====
-dt       = 0.05;              % s
+dt       = 0.02;              % s
 v_ship_m = 1.2;               % m/s
 v_ref    = v_ship_m / cell_m; % grid/s
 Ld       = 6;                 % lookahead (grid)
@@ -697,10 +736,27 @@ Ye_prev = 0;
 
     %% 6) ILOS Guidance
     Ld_local    = max(0.4, min(Ld, 0.6*remaining));
-    v_ref_seg   = v_ref * max(0.3, min(1.0, remaining/3.0));
+    v_ref_seg   = v_ref * max(0.65, min(1.0, remaining/3.0));
 
     [psi_des, Ye, Ye_int, Ye_prev] = ilos_guidance( ...
         p_ref, psi_path, [x y], Ye_int, Ye_prev, ilosParams, dt);
+    % ==========================================
+% TERMINAL GOAL GUIDANCE
+% ==========================================
+if dist_goal < 4.0
+
+    psi_goal = atan2(goal(2)-y, goal(1)-x);
+
+    alpha = min(1, (4.0-dist_goal)/4.0);
+
+    psi_des = atan2( ...
+        (1-alpha)*sin(psi_des) + alpha*sin(psi_goal), ...
+        (1-alpha)*cos(psi_des) + alpha*cos(psi_goal));
+
+    % slowdown dekat goal
+    v_ref_seg = v_ref_seg * max(0.25, dist_goal/4.0);
+
+end
 %% ===== SAPF FROM CAMERA =====
 if ~isempty(obs_cam)
 
@@ -719,6 +775,9 @@ if ~isempty(obs_cam)
 end
 
     %% 7) Controller + guard + sway PD
+if dist_goal < 3.0
+    obstacles_rt = [];
+end
     Tcmd = controller_guard_4dof_ilos([x y psi], nu, psi_des, v_ref_seg, Ld_local, ...
             obstacles_rt, safeDist, avoid, ...
             Ku, Kr, Tmax, Nmax, r_max_cmd, ...
@@ -1153,9 +1212,9 @@ function T = controller_guard_4dof_ilos(eta,Vb,psi_des,u_ref,Ld, ...
 
 e_psi = atan2(sin(psi_des-psi), cos(psi_des-psi));
 
-Kpsi = 1.8;
-Kr   = 22.0;
-Kd_r = 10.0;
+Kpsi = 3.5;
+Kr   = 55.0;
+Kd_r = 4.0;
     r_cmd = yaw_avoid + Kpsi*e_psi;
     r_cmd = max(-r_max_cmd, min(r_max_cmd, r_cmd));
 
@@ -1166,14 +1225,17 @@ u_cmd   = u_ref_eff * u_scale;
 Fx = Ku*(u_cmd-u);
 Fx = max(-Tmax,min(Tmax,Fx));
 
-Mz = Kr*(r_cmd-r) - Kd_r*r;
-Mz = max(-Nmax,min(Nmax,Mz));
+% ==================================
+% YAW CONTROL SEKARANG LEWAT Fy
+% ==================================
+Fy = Kr*(r_cmd-r) - Kd_r*r;
 
-Fy = Kv*(v_ref_sway - v) - Kdv*v;
-Fy = max(-Ymax, min(Ymax, Fy));
+Fy = max(-Ymax,min(Ymax,Fy));
+
+% yaw moment tidak dipakai lagi
+Mz = 0;
 
 T = [Fx Fy Mz];
-
 end
 
 function cum = cumulativeArc(P)
@@ -1343,43 +1405,99 @@ function Q = remove_dups(Q)
     Q = Q(keep,:);
 end
 
-function [Vdot, eta_dot] = usv4dof(V,T,psi,phi,P)
+function [Vdot, eta_dot] = usv4dof(V,U,psi,phi,P)
 
-u=V(1); v=V(2); r=V(3); p=V(4);
+% ==========================================
+% STATE
+% ==========================================
+u = V(1);
+v = V(2);
+r = V(3);
+p = V(4);
 
-m=P.m; mx=P.mx; my=P.my;
-ay=P.alphay; lx=P.lx; ly=P.ly;
-Iz=P.Iz; Jz=P.Jz;
-Ix=P.Ix; Jx=P.Jx;
+% ==========================================
+% INPUT
+% ==========================================
+Fx = U(1);
+Fy = U(2);
 
-M = [m+mx 0 0 0;
-     0 m+my my*ay-my*ly 0;
-     0 my*ay Iz+Jz 0;
-     0 -my*ly 0 Ix+Jx];
+% yaw moment tidak dipakai
+Mz = U(3);
 
-C = [0 -(m+my)*r 0 0;
-     (m+mx)*r 0 0 0;
-     0 0 0 0;
-     0 0 -mx*lx*u 0];
+% disturbance
+TeU   = 0;
+TeV   = 0;
+TePhi = 0;
+TeR   = 0;
 
-Xd = P.Xu*u + P.Xuu*abs(u)*u;
-Yd = P.Yv*v + P.Yvv*abs(v)*v;
-Nd = P.Nr*r + P.Nrr*abs(r)*r;
-Kd = P.Kp*p + P.Kpp*abs(p)*p;
+% ==========================================
+% SURGE
+% ==========================================
+udot = ...
+      P.A1*v*r ...
+    + P.A2*u ...
+    + P.A3*abs(u)*u ...
+    + P.A4*(abs(u)^2)*u ...
+    + P.A18*Fx ...
+    + TeU;
 
-tau_d = [Xd;Yd;Nd;Kd];
+% ==========================================
+% SWAY
+% ==========================================
+vdot = ...
+     -(1/P.A1)*u*r ...
+    + P.A5*v ...
+    + P.A6*abs(v)*v ...
+    + P.A7*(abs(v)^2)*v ...
+    + P.A8*abs(r)*v ...
+    + P.A9*abs(v)*r ...
+    + TeV;
 
-tau_rest = [0;0;0;-P.W*P.GMT*phi];
-tau_cen  = [0;0;0;P.m*P.hCG*u*r];
+% ==========================================
+% YAW
+% ==========================================
+rdot = ...
+    -P.A10*v*u ...
+    +P.A11*u*v ...
+    +P.A12*r ...
+    +P.A13*abs(r)*r ...
+    +P.A14*(abs(r)^2)*r ...
+    +P.A15*abs(r)*u ...
+    +P.A16*abs(u)*r ...
+    +P.A17*abs(u)*u ...
+    +P.A20*abs(r)*u ...
+    +P.A21*abs(u)*r ...
+    +P.A22*abs(u)*u ...
+    +P.A19*Fy ...
+    +TeR;
 
-rhs = T + tau_d + tau_rest + tau_cen - C*V;
+% ==========================================
+% ROLL
+% ==========================================
+pdot = ...
+    -P.KpLin*p ...
+    -P.KpAbs*abs(p)*p ...
+    -P.KpCub*(abs(p)^2)*p ...
+    -P.Kphi*sin(phi) ...
+    +P.Kfy*Fy ...
+    +P.Kv*v ...
+    +P.Kr*r ...
+    +P.Kbias ...
+    +TePhi;
 
-Vdot = M\rhs;
+% ==========================================
+% STATE DERIVATIVE
+% ==========================================
+Vdot = [udot; vdot; rdot; pdot];
 
+% ==========================================
+% KINEMATICS
+% ==========================================
 xdot = u*cos(psi)-v*sin(psi);
 ydot = u*sin(psi)+v*cos(psi);
 
 eta_dot = [xdot; ydot; r; p];
+
 end
 
 function [seen, meas] = camera_detect(pos, psi, obsDyn, camera)
