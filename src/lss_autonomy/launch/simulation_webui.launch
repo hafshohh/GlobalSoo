@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+  <!--
+    Simulasi USV 4-DOF + Web UI
+
+    Cara pakai:
+      Terminal 1: roslaunch lss_autonomy simulation_webui.launch
+      Terminal 2: cd ~/Documents/web_ui && npm run dev
+      Browser   : http://localhost:3000  (rosbridge URL: ws://localhost:9090)
+
+    Di Web UI:
+      1. Klik peta untuk tambah waypoint
+      2. Klik "Send to ROS" untuk kirim ke planner
+      3. Path hasil perencanaan tampil sebagai garis biru di peta
+      4. Ikon kapal bergerak mengikuti simulasi
+  -->
+
+  <!-- Rosbridge: penghubung Web UI ke ROS -->
+  <include file="$(find rosbridge_server)/launch/rosbridge_websocket.launch">
+    <arg name="port" value="9090"/>
+  </include>
+
+  <!-- USV Simulator 4-DOF -->
+  <node pkg="lss_autonomy" type="usv_simulator_4dof.py"
+        name="usv_simulator" output="screen">
+    <param name="x_init"      value="-64.65" />
+    <param name="y_init"      value="54.89" />
+    <param name="yaw_init"    value="0.0" />
+    <param name="dt"          value="0.02" />
+    <param name="u_max_ms"    value="3.0" />
+    <param name="v_max_ms"    value="3.0" />
+    <param name="Ku"          value="80.0" />
+    <param name="Kr"          value="55.0" />
+    <param name="Kd_r"        value="4.0"  />
+    <param name="lim_TX"      value="200.0" />
+    <param name="lim_TY"      value="60.0"  />
+    <param name="lim_TK"      value="60.0"  />
+    <param name="phi_max_deg" value="10.0" />
+  </node>
+
+  <!-- Jembatan /odom → /tf_simple/pose + /tf_simple/yaw untuk Web UI -->
+  <node pkg="lss_autonomy" type="sim_odom_bridge.py"
+        name="sim_odom_bridge" output="screen"/>
+
+  <!-- Waypoint Loader: baca YAML, publish ke /waypoints/mission_1/in -->
+  <node pkg="lss_autonomy" type="waypoint_loader.py"
+        name="waypoint_loader" output="screen">
+    <param name="waypoints_file"
+           value="$(find lss_autonomy)/config/waypoints.yaml" />
+  </node>
+
+  <!-- Mission Control -->
+  <node pkg="lss_autonomy" type="mission_control.py"
+        name="mission_manager_node" output="screen" />
+
+  <!-- ILOS Path Follower — parameter identik dengan real USV (lss_system.launch) -->
+  <node pkg="lss_autonomy" type="ilos_follower.py"
+        name="ilos_follower" output="screen">
+    <param name="dt"                  value="0.02"  />
+    <!-- ILOS Guidance -->
+    <param name="k_integral"          value="0.1"   />
+    <param name="lookahead"           value="7.0"   />
+    <param name="cte_reset_threshold" value="3.0"   />
+    <param name="lookahead_k"         value="1.5"   />
+    <param name="psi_filter_tau"      value="0.5"   />
+    <!-- PID Heading -->
+    <param name="kp_psi"              value="2.0"   />
+    <param name="ki_psi"              value="0.05"  />
+    <param name="kd_psi"              value="0.5"   />
+    <!-- Misi -->
+    <param name="u_des"               value="1.5"   />
+    <param name="goal_tol"            value="4.0"   />
+    <param name="arrive_dist"         value="2.0"   />
+    <param name="fade_in_sec"         value="4.0"   />
+  </node>
+
+  <!-- D* Lite Grid Planner -->
+  <node pkg="lss_autonomy" type="dstar_lite.py"
+        name="dstar_grid_planner" output="screen">
+    <param name="cell_m"          value="2.0" />
+    <param name="safe_dist_m"     value="1.5" />
+    <param name="safe_plan_m"     value="0.3" />
+    <param name="w_heuristic"     value="1.0" />
+    <param name="auto_extent"     value="true" />
+    <param name="padding"         value="5.0"  />
+    <!-- Kosongkan obstacle statis default MATLAB agar tidak menghalangi path nyata -->
+    <rosparam param="static_obstacles">[]</rosparam>
+  </node>
+
+  <!-- Telemetry Publisher: agregat data simulasi → /telemetry/nav_status untuk Web UI -->
+  <node pkg="lss_localization" type="monitoring_publisher.py"
+        name="telemetry_publisher" output="screen">
+    <param name="source" value="sim"/>
+    <param name="rate"   value="10"/>
+  </node>
+
+  <!-- Path Smoother: G2-CBS C² -->
+  <node pkg="lss_autonomy" type="path_smoother.py"
+        name="path_smoother" output="screen">
+    <param name="n_per_seg"        value="25"  />
+    <param name="eps_rdp"          value="1.0" />
+    <param name="safe_dist_m"      value="0.3" />
+    <param name="max_iter"         value="80"  />
+    <param name="gain"             value="0.6" />
+    <param name="max_step"         value="0.2" />
+    <param name="lambda"           value="0.15"/>
+    <param name="ds"               value="0.5" />
+    <!-- Kosongkan obstacle statis default MATLAB agar LOS shortcutter tidak
+         memangkas path menjadi 2 titik (langsung ke WP3) -->
+    <rosparam param="static_obstacles">[]</rosparam>
+  </node>
+
+</launch>

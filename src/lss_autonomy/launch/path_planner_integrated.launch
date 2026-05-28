@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+  <!-- D* Lite (Grid) + PID + ILOS — real USV only -->
+
+  <node pkg="lss_autonomy" type="path_planner_dstar_apf.py"
+        name="path_planner"
+        output="screen"
+        launch-prefix="python3">
+
+    <remap from="odom"      to="/asv/odom"/>
+    <remap from="waypoints" to="/waypoints/mission_1/in"/>
+
+    <!-- USV -->
+    <param name="usv_length"          value="1.6"  type="double"/>
+    <param name="control_dt"          value="0.1"  type="double"/>
+    <!-- Occupancy grid -->
+    <param name="cell_m"              value="2.0"  type="double"/>
+    <param name="padding_m"           value="5.0"  type="double"/>
+    <param name="safe_dist_m"         value="1.5"  type="double"/>
+    <param name="safe_plan_m"         value="0.3"  type="double"/>
+    <!-- Path Smoothing (G2-CBS C²) -->
+    <param name="n_per_seg"           value="25"   type="int"/>
+    <param name="eps_rdp"             value="1.0"  type="double"/>
+    <!-- D* Lite heuristic weight (1=optimal, >1=lebih cepat ε-suboptimal) -->
+    <param name="heuristic_w"         value="1.2"  type="double"/>
+    <!-- ILOS Guidance -->
+    <param name="k_integral"          value="0.3"  type="double"/>
+    <param name="lookahead"           value="2.5"  type="double"/>
+    <param name="cte_reset_threshold" value="1.5"  type="double"/>
+    <param name="lookahead_k"         value="1.5"  type="double"/>
+    <param name="psi_filter_tau"      value="0.67" type="double"/>
+    <!-- PID Heading -->
+    <param name="kp_psi"              value="2.0"  type="double"/>
+    <param name="ki_psi"              value="0.05" type="double"/>
+    <param name="kd_psi"              value="0.5"  type="double"/>
+    <!-- Arrival -->
+    <param name="arrive_dist"         value="2.0"  type="double"/>
+    <param name="goal_tol"            value="4.0"  type="double"/>
+    <!-- PID Speed -->
+    <param name="kp_u"                value="0.8"  type="double"/>
+    <param name="ki_u"                value="0.02" type="double"/>
+    <param name="kd_u"                value="0.3"  type="double"/>
+  </node>
+
+</launch>

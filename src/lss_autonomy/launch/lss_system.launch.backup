@@ -1,0 +1,24 @@
+<launch>
+    <!-- Server Web UI -->
+    <include file="$(find rosbridge_server)/launch/rosbridge_websocket.launch">
+        <arg name="port" value="9090"/>
+    </include>
+
+    <!-- Node Localization (GPS to Local Coordinates) -->
+    <node pkg="lss_localization" type="boat_tf.py" name="boat_localization" output="screen" />
+
+    <!-- Node Vision (Object Detection & Tracking) -->
+    <node pkg="lss_vision" type="vision.py" name="vision_node" output="screen" />
+
+    <!-- Node Pengendali Misi Otonom -->
+    <node pkg="lss_autonomy" type="mission_control.py" name="mission_manager_node" output="screen" />
+
+    <!-- Node Obstacle Avoidance (Vision-based) -->
+    <node pkg="lss_autonomy" type="obstacle_avoidance.py" name="obstacle_avoidance" output="screen" />
+
+    <!-- Node Perantara (Controller Utama Pendorong Motor) -->
+    <node pkg="lss_controller" type="differential_control.py" name="control" output="screen" />
+
+    <!-- Node Perantara (Controller Utama Pendorong Motor) -->
+    <node pkg="lss_localization" type="monitoring_publisher.py" name="monit" output="screen" />
+</launch>

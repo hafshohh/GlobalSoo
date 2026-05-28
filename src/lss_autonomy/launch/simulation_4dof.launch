@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+  <!--
+    Simulasi USV 4-DOF (port dari MATLAB cobadin.m)
+    Mengganti usv_simulator.py dengan usv_simulator_4dof.py
+    Semua node lain (path planner, waypoint, RViz) tetap sama.
+
+    Initial position dari MATLAB:
+      start_m = [1.0, 8.0]  (meter)
+      heading = 0 rad
+  -->
+
+  <master auto="start"/>
+
+  <!-- USV Simulator 4-DOF (LSS-01: surge, sway, yaw, roll) -->
+  <node pkg="lss_autonomy" type="usv_simulator_4dof.py"
+        name="usv_simulator" output="screen">
+    <!-- Initial position dalam meter (sama dengan MATLAB start_m) -->
+    <param name="x_init"      value="1.0" />
+    <param name="y_init"      value="8.0" />
+    <param name="yaw_init"    value="0.0" />
+    <!-- Timestep: sama dengan MATLAB dt=0.02 -->
+    <param name="dt"          value="0.02" />
+    <!-- Batas kecepatan -->
+    <param name="u_max_ms"    value="3.0" />
+    <param name="v_max_ms"    value="3.0" />
+    <!-- Controller gains (sama dengan MATLAB) -->
+    <param name="Ku"          value="80.0" />
+    <param name="Kr"          value="55.0" />
+    <param name="Kd_r"        value="4.0"  />
+    <!-- Batas aktuator (dari MATLAB lims) -->
+    <param name="lim_TX"      value="200.0" />
+    <param name="lim_TY"      value="60.0"  />
+    <param name="lim_TK"      value="60.0"  />
+    <!-- Banking: max roll 10 deg -->
+    <param name="phi_max_deg" value="10.0" />
+  </node>
+
+  <!-- ILOS Path Follower: subscribe /planned_path_smooth → publish /cmd_vel -->
+  <node pkg="lss_autonomy" type="ilos_follower.py"
+        name="ilos_follower" output="screen">
+    <param name="dt"          value="0.02"  />
+    <param name="k_cross"     value="0.5"   />
+    <param name="k_integral"  value="0.05"  />
+    <param name="kp_psi"      value="1.5"   />
+    <param name="u_des"       value="1.5"   />
+    <param name="goal_tol"    value="4.0"   />
+    <param name="arrive_dist" value="1.0"   />
+  </node>
+
+  <!-- Waypoint Loader (tidak diubah) -->
+  <node pkg="lss_autonomy" type="waypoint_loader.py"
+        name="waypoint_loader" output="screen">
+    <param name="waypoints_file"
+           value="$(find lss_autonomy)/config/waypoints.yaml" />
+  </node>
+
+  <!-- Mission Control -->
+  <node pkg="lss_autonomy" type="mission_control.py"
+        name="mission_manager_node" output="screen" />
+
+  <!-- Waypoint Visualizer -->
+  <node pkg="lss_autonomy" type="waypoint_visualizer.py"
+        name="waypoint_visualizer" output="screen" />
+
+  <!-- D* Lite berbasis Occupancy Grid (dari dstar_lite.py) -->
+  <!-- /planned_path_grid    = path hasil D* Grid             -->
+  <!-- /occupancy_grid_dstar = peta grid untuk RViz           -->
+  <node pkg="lss_autonomy" type="dstar_lite.py"
+        name="dstar_grid_planner" output="screen">
+    <!-- Ukuran sel grid: sama dengan MATLAB cell_m=2 -->
+    <param name="cell_m"        value="2.0" />
+    <!-- Inflasi obstacle: safe_plan + safe_dist (MATLAB = 0.3+0.6=0.9m) -->
+    <param name="safe_dist_m"   value="0.6" />
+    <param name="safe_plan_m"   value="0.3" />
+    <!-- Heuristic weight: 1 = admissible (MATLAB w=1) -->
+    <param name="w_heuristic"   value="1.0" />
+    <!-- Auto-extent: peta otomatis mencakup semua waypoint + obstacle -->
+    <param name="auto_extent"   value="true" />
+    <param name="padding"       value="5.0"  />
+    <!-- Obstacle statis default dari MATLAB (koordinat lokal meter) -->
+    <!-- Override jika memakai koordinat GPS: set static_obstacles=[] -->
+  </node>
+
+  <!-- Path Smoother: G2-CBS C² + Clearance Enforcement              -->
+  <!-- Membaca /planned_path_grid → publish /planned_path_smooth     -->
+  <node pkg="lss_autonomy" type="path_smoother.py"
+        name="path_smoother" output="screen">
+    <!-- Sampel per segmen Bezier (MATLAB samplesPerSeg=25) -->
+    <param name="n_per_seg"   value="25"  />
+    <!-- RDP threshold [m] (MATLAB epsRDP=0.3 grid = 0.6m) -->
+    <param name="eps_rdp"     value="0.6" />
+    <!-- Jarak aman clearance enforcement (MATLAB safePlan_m=0.3m) -->
+    <param name="safe_dist_m" value="0.3" />
+    <!-- Parameter iterasi clearance -->
+    <param name="max_iter"    value="80"  />
+    <param name="gain"        value="0.6" />
+    <param name="max_step"    value="0.2" />
+    <param name="lambda"      value="0.15"/>
+    <param name="ds"          value="0.5" />
+  </node>
+
+  <!-- RViz -->
+  <node pkg="rviz" type="rviz" name="rviz"
+        args="-d $(find lss_autonomy)/rviz/simulation.rviz"
+        output="screen" />
+
+</launch>

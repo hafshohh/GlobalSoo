@@ -1,0 +1,46 @@
+<launch>
+    <!-- Waypoint Loader (Load YAML and Publish Path) -->
+    <node pkg="lss_autonomy" type="waypoint_loader.py" name="waypoint_loader" output="screen">
+        <param name="waypoints_file" value="$(find lss_autonomy)/config/waypoints.yaml" />
+    </node>
+
+    <!-- Server Web UI -->
+    <include file="$(find rosbridge_server)/launch/rosbridge_websocket.launch">
+        <arg name="port" value="9090"/>
+    </include>
+
+    <!-- Node Localization (GPS to Local Coordinates) -->
+    <node pkg="lss_localization" type="boat_tf.py" name="boat_localization" output="screen" />
+
+    <!-- Node Vision (Object Detection & Tracking) -->
+    <node pkg="lss_vision" type="vision.py" name="vision_node" output="screen" />
+
+    <!-- Node Pengendali Misi Otonom -->
+    <node pkg="lss_autonomy" type="mission_control.py" name="mission_manager_node" output="screen">
+        <remap from="odom" to="/asv/odom"/>
+    </node>
+
+    <!-- Node Obstacle Avoidance (Vision-based + SAPF) -->
+    <node pkg="lss_autonomy" type="obstacle_avoidance.py" name="obstacle_avoidance" output="screen">
+        <param name="base_speed"       value="0.333" />
+        <param name="obs_assumed_dist" value="3.0"   />
+        <param name="yaw_max_deg"      value="60.0"  />
+        <param name="lookahead"        value="3.0"   />
+        <param name="k_att"            value="1.0"   />
+        <param name="k_rep"            value="0.8"   />
+        <param name="d_rep"            value="4.0"   />
+    </node>
+
+    <!-- Node Perantara (Controller Utama Pendorong Motor) -->
+    <node pkg="lss_controller" type="differential_control.py" name="control" output="screen">
+        <param name="rudder_max_deg" value="40.0" />
+        <param name="serial_port"    value="/dev/ttyUSB0" />
+        <param name="baudrate"       value="115200" />
+    </node>
+
+    <!-- Telemetry Publisher: agregat data sensor → /telemetry/nav_status untuk Web UI -->
+    <node pkg="lss_localization" type="monitoring_publisher.py" name="monit" output="screen" />
+
+    <!-- Path Planner: D* Lite + PID + ILOS -->
+    <include file="$(find lss_autonomy)/launch/path_planner_integrated.launch"/>
+</launch>

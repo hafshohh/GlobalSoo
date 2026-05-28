@@ -1,0 +1,72 @@
+Panels:
+  - Class: rviz/Displays
+    Help Height: 78
+    Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /Global Options1
+        - /Status1
+        - /TF1
+        - /Odometry1
+        - /Path1
+      Splitter Ratio: 0.5
+    Tree Height: 434
+  - Class: rviz/Selection
+    Name: Selection
+  - Class: rviz/Tool Properties
+    Expanded:
+      - /2D Pose Estimate1
+      - /2D Nav Goal1
+    Name: Tool Properties
+    Splitter Ratio: 0.588679
+  - Class: rviz/Views
+    Expanded:
+      - /Current View1
+    Name: Views
+    Splitter Ratio: 0.5
+Preferences:
+  PromptSaveOnExit: true
+Toolbars:
+  toolButtonStyle: 2
+Views:
+  Current:
+    Class: rviz/Orbit
+    Distance: 50
+    Enable Stereo Rendering:
+      Stereo Eye Separation: 0.06
+      Stereo Focal Distance: 1
+      Swap Stereo Eyes: false
+    Focal Point:
+      X: 0
+      Y: 0
+      Z: 0
+    Focal Shape Fixed Size: true
+    Focal Shape Size: 0.05
+    Invert Z Axis: false
+    Name: Current View
+    Near Clip Distance: 0.01
+    Pitch: 0.785398
+    Target Frame: <Fixed Frame>
+    Yaw: 0.785398
+  Saved Views: {}
+Window Geometry:
+  Displays:
+    collapsed: false
+    height: 846
+    width: 1268
+  Selection:
+    collapsed: false
+    height: 248
+    width: 248
+  Tool Properties:
+    collapsed: false
+    height: 0
+    width: 248
+  Views:
+    collapsed: false
+    height: 248
+    width: 248
+  Height: 1043
+  Width: 1520
+  X: 0
+  Y: 0
